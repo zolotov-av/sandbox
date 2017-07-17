@@ -1,0 +1,9 @@
+Package: hello
+Version: 0.1
+Section: misc
+Source: sandbox
+Architecture: @DEB_ARCH@
+Maintainer: Alex V. Zolotov <zolotov-alex@shamangrad.net>
+Priority: extra
+Depends: libc6
+Description: 'hello world' program

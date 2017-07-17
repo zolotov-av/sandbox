@@ -1,0 +1,133 @@
+
+############################ AUTOCONF VARS ###################################
+
+# архитектура на которой будет происходить компиляция
+BUILD_SYSTEM:=@build@
+BUILD_CPU:=@build_cpu@
+BUILD_VENDOR:=@build_vendor@
+BUILD_OS:=@build_os@
+
+# архитектура на которой будут запускаться скомпилированные программы
+HOST_SYSTEM:=@host@
+HOST_CPU:=@host_cpu@
+HOST_VENDOR:=@host_vendor@
+HOST_OS:=@host_os@
+
+# целевая архитектура компилируемого компилятора
+#
+# Пояснение: это нужно для компиляции компиляторов, в частности самого gcc,
+#   задает архитектуру, для которой будущий (компилируемый) компилятор
+#   будет компилировать программы. В большинстве проектов не требуется.
+TARGET_SYSTEM:=@target@
+TARGET_CPU:=@target_cpu@
+TARGET_VENDOR:=@target_vendor@
+TARGET_OS:=@target_os@
+
+# архитектура для которой будет собираться deb-пакет.
+# сборщик пакетов и компилятор имеют разную терминлогию,
+# в скрипте configure мы транслируем HOST_CPU в имя архитектуры которую
+# ожидает менеджер пакетов
+DEB_ARCH:=@DEB_ARCH@
+
+# кодовое имя целевой операционной системы, задается произвольно через
+# --with-codename и используется только для того, чтобы было меньше путаницы
+# с пакетами, для какой ОС они собирались
+CODENAME:=@CODENAME@
+
+# флаги препроцессора для C/C++
+CPPFLAGS=@CPPFLAGS@
+
+# флаги компоновщика
+LDFLAGS=@LDFLAGS@
+
+# configure может снабдить нас дополнительными опциями компилятора
+# так же мы можем передавать свои опции компилятора в configure
+# через одноименную переменную окружения и они появятся здесь
+CXXFLAGS=@CXXFLAGS@
+
+# команда запуска компилятора
+# берем имя компилятора, которое дает нам configure и доплняем его опциями
+CXX:=@CXX@ $(CPPFLAGS) $(CXXFLAGS) -ffunction-sections -I.
+
+# команда запуска компоновщика
+LD=@CXX@ -Wl,--gc-sections
+
+# список библиотек в виде списка опций ( -lfoo для библиотеки libfoo.so )
+LIBS=
+
+# можно сделать по аналогии с $(CXX), но мне лень
+AR:=ar
+RANLIB:=ranlib
+
+############################### VARS #########################################
+
+# программы
+PROGS+=hello
+
+# имя deb-пакета
+DEB_HELLO:=hello-$(CODENAME)-$(DEB_ARCH).deb
+
+# объектные модули которые пойдут в программу
+OBJECTS+=obj/main.o
+
+# объектные модули которые пойдут в библиотеку
+#LIBOBJECTS+=obj/foo.o
+#LIBOBJECTS+=obj/bar.o
+#LIBOBJECTS+=obj/banana.o
+
+############################# GENERIC RULES ##################################
+
+# .PHONY указывает цели которые не создают файлов.
+.PHONY: all deb clean distclean
+
+# первая цель - главная, она будет запускаться когда цель явно не указана
+all: progs
+
+.PHONY: progs
+progs: $(PROGS)
+
+# сборка deb-пакетов, просто короткая цель чтобы не вспоминать имя пакета
+.PHONY: deb
+deb: deb_hello
+
+.PHONY: deb_hello deb_hello_clean deb_hello_install
+deb_hello: deb_hello_clean deb_hello_install
+	fakeroot dpkg-deb --build deb $(DEB_HELLO)
+
+deb_hello_clean:
+	rm -rf deb/usr
+	rm -rf hello-*.deb
+
+deb_hello_install:
+	mkdir -p deb/usr/bin/
+	mkdir -p deb/usr/share/hello/
+	install -m 0755 hello deb/usr/bin/
+	install -m 0644 README.md deb/usr/share/hello/
+
+########################## BUILD RULES #######################################
+
+hello: $(OBJECTS)
+	$(CXX) $(LDFLAGS) $(OBJECTS) -o hello $(LIBS)
+
+obj/main.o: src/main.cpp src/config.h
+	$(CXX) -c src/main.cpp -o obj/main.o
+
+########################### CLEAN RULES ######################################
+
+# полная очистка
+distclean: clean deb_clean
+	rm -f Makefile
+	rm -f deb/DEBIAN/control hello-*.deb
+	rm -f config.log config.status src/config.h
+	rm -rf autom4te.cache
+	rm -rf $(PROGS)
+
+# простая очистка, промежуточные файлы, но оставляет целевые
+clean:
+	rm -f obj/*.o
+
+# зачистка в каталоге deb-пакета
+.PHONY: deb_clean
+deb_clean:
+	rm -rf deb/usr hello-*.deb 
+
